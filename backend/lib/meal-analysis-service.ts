@@ -63,7 +63,7 @@ export type MealAnalysisAttemptLog = {
   ok: boolean;
 };
 
-async function callChatCompletions(
+export async function callChatCompletions(
   provider: MealAnalysisProvider,
   payload: unknown
 ): Promise<OpenAIChatResponse> {

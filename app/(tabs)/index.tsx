@@ -23,7 +23,7 @@ const CAROUSEL_CARD_WIDTH = SCREEN_WIDTH - 28;
 const CAROUSEL_GAP = 12;
 
 import { Stack, router } from 'expo-router';
-import { Flame, X, Camera, ImageIcon, ChevronLeft, ChevronRight, Trash2, Plus, Bookmark, Clock, Star, Search as SearchIcon, Droplets, Minus, ChevronRight as ChevronRightIcon, Utensils, Target, TrendingDown, TrendingUp } from 'lucide-react-native';
+import { Flame, X, Camera, ImageIcon, ChevronLeft, ChevronRight, Trash2, Plus, Bookmark, Clock, Star, Search as SearchIcon, Droplets, Minus, Check } from 'lucide-react-native';
 import { useNutrition, useTodayProgress, PendingFoodEntry } from '@/contexts/NutritionContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';

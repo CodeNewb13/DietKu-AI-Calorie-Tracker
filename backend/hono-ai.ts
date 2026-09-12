@@ -2,14 +2,15 @@ import { Hono } from "hono";
 import { z } from "zod";
 import {
   analyzeMealImage,
+  callChatCompletions,
   configuredProviderName,
   mealAnalysisConfigured,
+  resolveMealAnalysisProvider,
 } from "./lib/meal-analysis-service";
 import { buildLegacyOpenAIChatResponse } from "../utils/mealAnalysisCore";
 import { checkRateLimit } from "./lib/rate-limit";
 import { supabase } from "./lib/supabase";
 
-const OPENAI_BASE_URL = "https://api.openai.com/v1/chat/completions";
 const MAX_IMAGE_BASE64_LENGTH = 2_000_000; // ~2MB payload ceiling
 
 const mealAnalysisInputSchema = z.object({
@@ -124,22 +125,14 @@ async function getDailyScanQuota(
   };
 }
 
-async function callOpenAI(payload: unknown) {
-  const apiKey = getOpenAIKey();
-  const response = await fetch(OPENAI_BASE_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenAI request failed: ${response.status} ${errorText}`);
-  }
-  return response.json();
+/**
+ * Chat-completions call for the non-meal-analysis routes. Uses the same AI_PROVIDER
+ * selection as meal analysis, so these routes keep working when the provider is not
+ * OpenAI; the provider supplies the model, so callers must not pass one.
+ */
+async function callChatModel(payload: Record<string, unknown>) {
+  const provider = resolveMealAnalysisProvider();
+  return callChatCompletions(provider, { ...payload, model: provider.model });
 }
 
 app.post("/meal-analysis", async (c) => {
@@ -320,8 +313,7 @@ app.post("/exercise-estimate", async (c) => {
       return c.json({ error: "Rate limit exceeded" }, 429);
     }
 
-    const openAIData = await callOpenAI({
-      model: "gpt-4o-mini",
+    const openAIData = await callChatModel({
       temperature: 0.3,
       messages: [
         {
@@ -343,8 +335,7 @@ app.post("/exercise-estimate", async (c) => {
 app.post("/translate", async (c) => {
   try {
     const input = translateInputSchema.parse(await c.req.json());
-    const openAIData = await callOpenAI({
-      model: "gpt-4o-mini",
+    const openAIData = await callChatModel({
       temperature: 0.3,
       messages: [
         {
@@ -438,8 +429,7 @@ app.post("/rank-usda", async (c) => {
   try {
     const input = rankInputSchema.parse(await c.req.json());
     const list = input.options.map((item, index) => `${index + 1}. ${item}`).join("\n");
-    const openAIData = await callOpenAI({
-      model: "gpt-4o-mini",
+    const openAIData = await callChatModel({
       temperature: 0.3,
       messages: [
         {

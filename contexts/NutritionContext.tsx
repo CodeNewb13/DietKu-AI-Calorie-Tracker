@@ -47,6 +47,23 @@ interface FoodLog {
   [date: string]: FoodEntry[];
 }
 
+const isLikelyOfflineError = (err: unknown): boolean => {
+  const msg = err instanceof Error ? err.message : String(err ?? '');
+  return /network request failed|failed to fetch|networkerror|network error|request timed out|timeout/i.test(
+    msg
+  );
+};
+
+const hasAuthBackendConnectivity = async (): Promise<boolean> => {
+  if (!SUPABASE_URL) return true;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/health`, { method: 'GET' });
+    return res.ok;
+  } catch {
+    return false;
+  }
+};
+
 interface StreakData {
   currentStreak: number;
   bestStreak: number;
@@ -122,6 +139,69 @@ const mapSupabaseFoodEntryToFoodEntry = (sfe: SupabaseFoodEntry): FoodEntry => (
   photoUri: sfe.photo_uri || undefined,
   loggedMealId: sfe.logged_meal_id ?? undefined,
 });
+
+/** Matches SIGNED_URL_EXPIRY_SECONDS in utils/supabaseStorage.ts. */
+const MEAL_PHOTO_SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 30;
+
+/**
+ * Storage object path -> displayable URI (signed URL, or a device-cached copy of it).
+ * Module-scoped so a refetch can reuse already-resolved photos instead of briefly
+ * rendering raw storage paths while enrichment re-runs.
+ */
+const mealPhotoUriCache = new Map<string, string>();
+
+/** Swap a stored photo path for an already-resolved display URI when one is known. */
+const resolveFoodEntryPhotoUriSync = (sfe: SupabaseFoodEntry): SupabaseFoodEntry => {
+  if (!sfe.photo_uri) return sfe;
+  const storagePath = getMealPhotoStoragePathFromValue(sfe.photo_uri);
+  if (!storagePath) return sfe;
+  const resolved = mealPhotoUriCache.get(storagePath);
+  return resolved ? { ...sfe, photo_uri: resolved } : sfe;
+};
+
+/**
+ * Turn storage paths into URIs the UI can actually render. Signed URLs are required
+ * because meal-photos is a private bucket; on native the file is then cached locally.
+ */
+const enrichFoodEntryPhotos = async (rows: SupabaseFoodEntry[]): Promise<SupabaseFoodEntry[]> => {
+  const unresolved = Array.from(
+    new Set(
+      rows
+        .map((row) => (row.photo_uri ? getMealPhotoStoragePathFromValue(row.photo_uri) : null))
+        .filter((path): path is string => !!path && !mealPhotoUriCache.has(path))
+    )
+  );
+
+  await Promise.all(
+    unresolved.map(async (storagePath) => {
+      try {
+        const { data, error } = await supabase.storage
+          .from(MEAL_PHOTOS_BUCKET)
+          .createSignedUrl(storagePath, MEAL_PHOTO_SIGNED_URL_TTL_SECONDS);
+        if (error || !data?.signedUrl) return;
+
+        let displayUri = data.signedUrl;
+        try {
+          displayUri = await getCachedMealPhotoUri(storagePath, data.signedUrl);
+        } catch {
+          // Fall back to the signed URL when local caching isn't available.
+        }
+        mealPhotoUriCache.set(storagePath, displayUri);
+      } catch {
+        // Leave unresolved; the next load retries.
+      }
+    })
+  );
+
+  return rows.map(resolveFoodEntryPhotoUriSync);
+};
+
+const groupFoodEntriesByDate = (rows: SupabaseFoodEntry[]): FoodLog =>
+  rows.reduce<FoodLog>((acc, row) => {
+    const entries = acc[row.date] ?? (acc[row.date] = []);
+    entries.push(mapSupabaseFoodEntryToFoodEntry(row));
+    return acc;
+  }, {});
 
 const mapFavoriteRow = (f: Record<string, unknown>): FavoriteMeal => ({
   id: String(f.id),
@@ -206,23 +286,6 @@ export const [NutritionProvider, useNutrition] = createContextHook(() => {
       const msg = err instanceof Error ? err.message : String(err ?? '');
       return /invalid refresh token|refresh token not found/i.test(msg);
     };
-    const isLikelyOfflineError = (err: unknown): boolean => {
-      const msg = err instanceof Error ? err.message : String(err ?? '');
-      return /network request failed|failed to fetch|networkerror|network error|request timed out|timeout/i.test(
-        msg
-      );
-    };
-    const hasAuthBackendConnectivity = async (): Promise<boolean> => {
-      if (!SUPABASE_URL) return true;
-      try {
-        const healthUrl = `${SUPABASE_URL}/auth/v1/health`;
-        const res = await fetch(healthUrl, { method: 'GET' });
-        return res.ok;
-      } catch {
-        return false;
-      }
-    };
-
     const clearBrokenLocalSession = async () => {
       try {
         // Local scope avoids failing when server-side token/session is already gone.
