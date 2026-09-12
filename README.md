@@ -1,5 +1,18 @@
 # Welcome to your Rork app
 
+## This fork / branch
+
+This is `CodeNewb13`'s fork of [`ktimothybudi-source/DietKu`](https://github.com/ktimothybudi-source/DietKu). The `local-dev-and-supabase-fixes` branch fixes a set of local-development and Supabase issues found while getting the app running from scratch:
+
+- **Gemini as a local AI provider** (`backend/lib/meal-analysis-service.ts`, `backend/hono-ai.ts`): meal-photo scanning can now route through Google's OpenAI-compatible Gemini endpoint via `AI_PROVIDER=gemini` in `.env`, so local development doesn't require an OpenAI API key. Production still defaults to OpenAI.
+- **Dev-only admin sign-in shortcut** (`app/_layout.tsx`, `lib/devSkip.ts`): on the web preview, pressing backtick (`` ` ``) three times signs into a real Supabase account (configured via `EXPO_PUBLIC_DEV_ADMIN_EMAIL`/`PASSWORD` in `.env`) instead of just bypassing the auth redirect with no session, which previously left the dashboard stuck loading with an empty profile.
+- **Fixed 11 migration files with duplicate date-only version prefixes** (e.g. three separate files all named `20260309_*.sql`) that made `supabase db push` unable to track them as distinct versions and crash partway through a full push. See `supabase/migrations/`.
+- **Fixed a migration missing a `DROP POLICY IF EXISTS` guard** (`20260521_community_group_name_member_update.sql`) that every other RLS migration in this repo already had.
+- **Added a migration to create the `meal-photos` Storage bucket + RLS policies** (`20260913_create_meal_photos_bucket.sql`). This bucket previously existed only as a manual step someone took in the Supabase Dashboard and was never captured as a migration — so on a freshly-provisioned Supabase project (e.g. after the original project was reset), every meal-photo save failed with no bucket to upload to.
+- Reorganized root-level docs/scripts into `docs/` and `scripts/` (no functional change).
+
+**Deploying these changes to production:** production infra (the `dietku.onrender.com` backend, the EAS project, and the App Store/Play Store listings) is owned by accounts under `ktimothybudi-source` / `timothykurniawan2`, not this fork. Merging this branch upstream requires a pull request reviewed and merged by the upstream repo owner; actually deploying (Render redeploy, `eas build`/`eas submit`) additionally requires access to those specific accounts, which this fork does not have on its own.
+
 ## Project info
 
 This is a native cross-platform mobile app created with [Rork](https://rork.com)
