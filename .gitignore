@@ -49,3 +49,6 @@ rork-eslint.config.js
 core
 node_modules
 .expo
+
+# Supabase CLI local link state (machine-specific, not portable)
+supabase/.temp

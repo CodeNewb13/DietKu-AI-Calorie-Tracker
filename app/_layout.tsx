@@ -4,7 +4,10 @@ import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as Notifications from "expo-notifications";
 import React, { useEffect, useRef } from "react";
+import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { devSkip } from "@/lib/devSkip";
+import { supabase } from "@/lib/supabase";
 import { NutritionProvider, useNutrition } from "@/contexts/NutritionContext";
 import { MealDraftProvider } from "@/contexts/MealDraftContext";
 import { ExerciseProvider } from "@/contexts/ExerciseContext";
@@ -52,6 +55,9 @@ function NotificationResponseHandler() {
   const handled = useRef<string | null>(null);
 
   useEffect(() => {
+    // expo-notifications response APIs are native-only; skip on web preview.
+    if (Platform.OS === 'web') return;
+
     const handleResponse = (response: Notifications.NotificationResponse) => {
       const id = response.notification.request.identifier;
       if (handled.current === id) return;
@@ -79,6 +85,51 @@ function NotificationResponseHandler() {
     return () => sub.remove();
   }, [router]);
 
+  return null;
+}
+
+/**
+ * DEV-ONLY (web): press the backtick key (`) 3x within 1s to sign in as the local
+ * dev admin account (see EXPO_PUBLIC_DEV_ADMIN_EMAIL/PASSWORD in .env) and jump
+ * straight to the main tabs. Never active in production or native builds.
+ */
+function DevSkipShortcut() {
+  const router = useRouter();
+  useEffect(() => {
+    if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') return;
+    let presses: number[] = [];
+    const onKey = (e: KeyboardEvent) => {
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) {
+        return;
+      }
+      if (e.key !== '`') return;
+      const now = Date.now();
+      presses = presses.filter((t) => now - t < 1000);
+      presses.push(now);
+      if (presses.length >= 3) {
+        presses = [];
+        const email = process.env.EXPO_PUBLIC_DEV_ADMIN_EMAIL;
+        const password = process.env.EXPO_PUBLIC_DEV_ADMIN_PASSWORD;
+        if (!email || !password) {
+          console.warn('[dev] shortcut: set EXPO_PUBLIC_DEV_ADMIN_EMAIL/PASSWORD in .env first');
+          return;
+        }
+        devSkip.active = true; // suppress the onboarding auth-guard redirect while sign-in resolves
+        console.log('[dev] secret shortcut → signing in as dev admin');
+        supabase.auth.signInWithPassword({ email, password }).then(({ error }) => {
+          if (error) {
+            console.error('[dev] shortcut sign-in failed:', error.message);
+            devSkip.active = false;
+            return;
+          }
+          router.replace('/(tabs)');
+        });
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [router]);
   return null;
 }
 
@@ -123,6 +174,7 @@ export default function RootLayout() {
                 <SplashController />
                 <PushTokenSync />
                 <NotificationResponseHandler />
+                <DevSkipShortcut />
                 <MealDraftProvider>
                   <SubscriptionProvider>
                     <ExerciseProvider>

@@ -43,6 +43,7 @@ import {
 } from '@/utils/nutritionCalculations';
 import { searchUSDAFoods, USDAFoodItem } from '@/utils/usdaApi';
 import { searchFoods } from '@/lib/foodsApi';
+import { devSkip } from '@/lib/devSkip';
 import { FoodSearchResult } from '@/types/food';
 import ProgressRing from '@/components/ProgressRing';
 import { DietKuWordmark } from '@/components/DietKuWordmark';
@@ -397,6 +398,7 @@ export default function HomeScreen() {
   );
 
   React.useEffect(() => {
+    if (__DEV__ && devSkip.active) return; // dev web shortcut: stay on tabs without auth
     if (isDashboardLoading) return;
     if (profile) return;
     // Guard against transient profile/auth fetch gaps so signed-in users are not bounced to onboarding.

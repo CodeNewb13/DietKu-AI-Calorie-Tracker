@@ -1,5 +1,7 @@
 -- Allow any group member to rename the group (not only the creator).
 
+DROP POLICY IF EXISTS "Group members can update their groups" ON community_groups;
+
 CREATE POLICY "Group members can update their groups"
   ON community_groups FOR UPDATE
   USING (

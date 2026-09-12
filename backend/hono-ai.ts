@@ -1,6 +1,10 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { analyzeMealImageWithOpenAI } from "./lib/meal-analysis-service";
+import {
+  analyzeMealImage,
+  configuredProviderName,
+  mealAnalysisConfigured,
+} from "./lib/meal-analysis-service";
 import { buildLegacyOpenAIChatResponse } from "../utils/mealAnalysisCore";
 import { checkRateLimit } from "./lib/rate-limit";
 import { supabase } from "./lib/supabase";
@@ -46,10 +50,6 @@ function getOpenAIKey(): string {
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new Error("Missing OPENAI_API_KEY");
   return key;
-}
-
-function openAIConfigured(): boolean {
-  return Boolean(process.env.OPENAI_API_KEY?.trim());
 }
 
 function getRequesterId(c: any, userId?: string): string {
@@ -144,10 +144,12 @@ async function callOpenAI(payload: unknown) {
 
 app.post("/meal-analysis", async (c) => {
   try {
-    if (!openAIConfigured()) {
+    if (!mealAnalysisConfigured()) {
+      const missingKey =
+        configuredProviderName() === "gemini" ? "GEMINI_API_KEY" : "OPENAI_API_KEY";
       return c.json(
         {
-          error: "Server misconfiguration: OPENAI_API_KEY is not set on the host (e.g. Render environment variables).",
+          error: `Server misconfiguration: ${missingKey} is not set on the host (e.g. Render environment variables).`,
           code: "OPENAI_NOT_CONFIGURED",
         },
         503
@@ -203,10 +205,10 @@ app.post("/meal-analysis", async (c) => {
     const dataUrl = `data:image/jpeg;base64,${sanitized}`;
 
     const language = input.language === "en" ? "en" : "id";
-    const apiKey = getOpenAIKey();
 
-    const { analysis, rawContent, logs } = await analyzeMealImageWithOpenAI({
-      apiKey,
+    const { analysis, rawContent, logs } = await analyzeMealImage({
+      // Non-default providers resolve their own key from env.
+      apiKey: configuredProviderName() === "openai" ? getOpenAIKey() : undefined,
       dataUrl,
       language,
     });
