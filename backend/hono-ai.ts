@@ -9,7 +9,7 @@ import {
 } from "./lib/meal-analysis-service";
 import { buildLegacyOpenAIChatResponse } from "../utils/mealAnalysisCore";
 import { checkRateLimit } from "./lib/rate-limit";
-import { supabase } from "./lib/supabase";
+import { hasServiceRoleKey, supabase } from "./lib/supabase";
 
 const MAX_IMAGE_BASE64_LENGTH = 2_000_000; // ~2MB payload ceiling
 
@@ -264,6 +264,17 @@ app.post("/meal-analysis-quota", async (c) => {
 
 app.post("/subscription-sync", async (c) => {
   try {
+    if (!hasServiceRoleKey) {
+      return c.json(
+        {
+          error:
+            "Server misconfiguration: SUPABASE_SERVICE_ROLE_KEY is not set on the host (e.g. Render environment variables).",
+          code: "SERVICE_ROLE_NOT_CONFIGURED",
+        },
+        503
+      );
+    }
+
     const input = subscriptionSyncInputSchema.parse(await c.req.json());
     const { data: userData, error: userError } = await supabase.auth.getUser(input.accessToken);
     if (userError || !userData.user) {
