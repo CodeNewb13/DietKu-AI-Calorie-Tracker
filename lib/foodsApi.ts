@@ -13,30 +13,11 @@ export async function searchFoods(
   console.log('[foodsApi] Searching foods for:', query, 'limit:', limit);
 
   try {
-    let data, error;
-    
-    // First try the 'food' table
-    const result1 = await supabase
+    const { data, error } = await supabase
       .from('food')
       .select('*')
       .ilike('name', `%${query}%`)
       .limit(limit);
-    
-    if (!result1.error && result1.data && result1.data.length > 0) {
-      console.log('[foodsApi] Found results in "food" table');
-      data = result1.data;
-      error = result1.error;
-    } else {
-      // Try 'foods' table as fallback
-      console.log('[foodsApi] Trying "foods" table...');
-      const result2 = await supabase
-        .from('foods')
-        .select('*')
-        .ilike('name', `%${query}%`)
-        .limit(limit);
-      data = result2.data;
-      error = result2.error;
-    }
 
     if (error) {
       console.error('[foodsApi] Supabase error:', error.message, error.code, error.details);
@@ -88,7 +69,7 @@ export async function getFoodById(id: number): Promise<FoodSearchResult | null> 
 
   try {
     const { data, error } = await supabase
-      .from('foods')
+      .from('food')
       .select('*')
       .eq('id', id)
       .single();
