@@ -37,7 +37,7 @@ cd "C:\Users\USER\Desktop\rork-dietku-clone-356-main"
 ### 4. Run the Setup Script (Optional)
 
 ```powershell
-.\push-to-github.ps1
+.\scripts\push-to-github.ps1
 ```
 
 Or follow manual steps below:

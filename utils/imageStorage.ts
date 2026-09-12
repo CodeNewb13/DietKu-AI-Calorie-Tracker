@@ -20,6 +20,10 @@ async function ensureDirectoryExists() {
 }
 
 export async function saveImagePermanently(tempUri: string): Promise<string> {
+  // No real filesystem on web; the picked/optimized URI (data:/blob:) is already
+  // usable as-is, and expo-file-system's web shim implements none of these calls.
+  if (Platform.OS === 'web') return tempUri;
+
   try {
     await ensureDirectoryExists();
     let sourceUri = tempUri;
@@ -46,6 +50,7 @@ export async function saveImagePermanently(tempUri: string): Promise<string> {
 }
 
 export async function deleteImage(uri: string): Promise<void> {
+  if (Platform.OS === 'web') return;
   try {
     const fileInfo = await FileSystem.getInfoAsync(uri);
     if (fileInfo.exists) {
@@ -58,6 +63,7 @@ export async function deleteImage(uri: string): Promise<void> {
 }
 
 export async function getAllStoredImages(): Promise<string[]> {
+  if (Platform.OS === 'web') return [];
   try {
     await ensureDirectoryExists();
     const files = await FileSystem.readDirectoryAsync(IMAGES_DIR);
@@ -69,6 +75,7 @@ export async function getAllStoredImages(): Promise<string[]> {
 }
 
 export async function getImageSize(): Promise<number> {
+  if (Platform.OS === 'web') return 0;
   try {
     await ensureDirectoryExists();
     const files = await FileSystem.readDirectoryAsync(IMAGES_DIR);

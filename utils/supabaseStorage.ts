@@ -88,11 +88,13 @@ function base64ToUint8Array(base64: string): Uint8Array {
 
 /**
  * Load image bytes for Supabase upload. RN iOS often throws "Network request failed" on fetch(file://...),
- * so local files are read via Expo FileSystem instead.
+ * so local files are read via Expo FileSystem instead. On web there is no file:// URI at all - picked/optimized
+ * images are data: or blob: URIs, which fetch() handles natively; expo-file-system's web module implements
+ * none of its methods (bare NativeModule shim), so routing these through FileSystem throws UnavailabilityError.
  */
 async function loadImageBytesForUpload(uri: string): Promise<{ body: Uint8Array; contentType: string }> {
-  const isRemote = /^https?:\/\//i.test(uri);
-  if (isRemote) {
+  const isFetchable = /^(https?|data|blob):/i.test(uri);
+  if (isFetchable) {
     const response = await fetch(uri);
     if (!response.ok) {
       throw new Error(`Failed to fetch image: ${response.status}`);

@@ -112,7 +112,7 @@ The following important files are included:
 - ✅ Backend code (`backend/`)
 - ✅ Database schemas (`supabase/`)
 - ✅ Configuration files (`package.json`, `app.json`, `tsconfig.json`)
-- ✅ Documentation (`SETUP.md`, `BACKEND_TASKS.md`, `EXTERNAL_SETUP_REQUIREMENTS.md`)
+- ✅ Documentation (`SETUP.md`, `docs/backend-tasks.md`, `docs/external-setup-requirements.md`)
 - ✅ Environment template (`.env.example`)
 
 ## Files Excluded (via .gitignore)
